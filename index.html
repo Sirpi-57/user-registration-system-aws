@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Registration Form</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        h1, h2 {
+            color: #333;
+        }
+        .form-container {
+            background-color: #f9f9f9;
+            padding: 20px;
+            border-radius: 5px;
+            margin-bottom: 30px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input[type="text"], 
+        input[type="number"] {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .users-list {
+            margin-top: 30px;
+        }
+        .user-card {
+            background-color: #f9f9f9;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 5px;
+            display: flex;
+            align-items: center;
+        }
+        .user-image {
+            width: 100px;
+            height: 100px;
+            object-fit: cover;
+            margin-right: 20px;
+            border-radius: 5px;
+        }
+        .user-info {
+            flex-grow: 1;
+        }
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+        }
+        .edit-btn {
+            background-color: #2196F3;
+        }
+        .edit-btn:hover {
+            background-color: #0b7dda;
+        }
+        .delete-btn {
+            background-color: #f44336;
+        }
+        .delete-btn:hover {
+            background-color: #da190b;
+        }
+        .loading {
+            display: none;
+            text-align: center;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>User Registration System</h1>
+    
+    <div class="form-container">
+        <h2>Add New User</h2>
+        <form id="userForm">
+            <input type="hidden" id="userId" value="">
+            <div class="form-group">
+                <label for="name">Name:</label>
+                <input type="text" id="name" required>
+            </div>
+            <div class="form-group">
+                <label for="rollNumber">Roll Number:</label>
+                <input type="text" id="rollNumber" required>
+            </div>
+            <div class="form-group">
+                <label for="address">Address:</label>
+                <input type="text" id="address" required>
+            </div>
+            <div class="form-group">
+                <label for="country">Country:</label>
+                <input type="text" id="country" required>
+            </div>
+            <div class="form-group">
+                <label for="pincode">Pincode:</label>
+                <input type="text" id="pincode" required>
+            </div>
+            <div class="form-group">
+                <label for="userImage">Profile Image:</label>
+                <input type="file" id="userImage" accept="image/*" required>
+            </div>
+            <button type="submit" id="submitBtn">Submit</button>
+        </form>
+    </div>
+
+    <div class="loading" id="loadingIndicator">
+        Loading...
+    </div>
+
+    <div class="users-list">
+        <h2>Registered Users</h2>
+        <div id="usersList"></div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // API endpoint URLs - replace with your actual AWS endpoints
+            const apiUrl = 'https://kdkpbjjeze.execute-api.ap-south-1.amazonaws.com/prod1';
+            const getUsersEndpoint = `${apiUrl}/users`;
+            const createUserEndpoint = `${apiUrl}/users`;
+            const updateUserEndpoint = `${apiUrl}/users?action=update`; // + &userId=123
+            const deleteUserEndpoint = `${apiUrl}/users?action=delete`; // + &userId=123
+            const getUploadUrlEndpoint = `${apiUrl}/upload-url`;
+
+            // DOM Elements
+            const userForm = document.getElementById('userForm');
+            const userIdInput = document.getElementById('userId');
+            const nameInput = document.getElementById('name');
+            const rollNumberInput = document.getElementById('rollNumber');
+            const addressInput = document.getElementById('address');
+            const countryInput = document.getElementById('country');
+            const pincodeInput = document.getElementById('pincode');
+            const userImageInput = document.getElementById('userImage');
+            const submitBtn = document.getElementById('submitBtn');
+            const usersList = document.getElementById('usersList');
+            const loadingIndicator = document.getElementById('loadingIndicator');
+
+            // Load users on page load
+            fetchUsers();
+
+            // Form submission
+            userForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                const isEditing = userIdInput.value !== '';
+                
+                if (isEditing) {
+                    updateUser(userIdInput.value);
+                } else {
+                    createUser();
+                }
+            });
+
+            // Fetch all users
+            function fetchUsers() {
+                showLoading(true);
+                
+                fetch(getUsersEndpoint)
+                    .then(response => response.json())
+                    .then(users => {
+                        displayUsers(users);
+                        showLoading(false);
+                    })
+                    .catch(error => {
+                        console.error('Error fetching users:', error);
+                        showLoading(false);
+                        alert('Failed to load users. Please try again.');
+                    });
+            }
+
+            // Display users in the list
+            function displayUsers(users) {
+                usersList.innerHTML = '';
+                
+                if (users.length === 0) {
+                    usersList.innerHTML = '<p>No users registered yet.</p>';
+                    return;
+                }
+                
+                users.forEach(user => {
+                    const userCard = document.createElement('div');
+                    userCard.className = 'user-card';
+                    
+                    userCard.innerHTML = `
+                        <img src="${user.imageUrl}" alt="${user.name}" class="user-image">
+                        <div class="user-info">
+                            <h3>${user.name}</h3>
+                            <p><strong>Roll Number:</strong> ${user.rollNumber}</p>
+                            <p><strong>Address:</strong> ${user.address}</p>
+                            <p><strong>Country:</strong> ${user.country}</p>
+                            <p><strong>Pincode:</strong> ${user.pincode}</p>
+                        </div>
+                        <div class="action-buttons">
+                            <button class="edit-btn" data-id="${user.userId}">Edit</button>
+                            <button class="delete-btn" data-id="${user.userId}">Delete</button>
+                        </div>
+                    `;
+                    
+                    usersList.appendChild(userCard);
+                    
+                    // Add event listeners for edit and delete buttons
+                    userCard.querySelector('.edit-btn').addEventListener('click', function() {
+                        fillFormForEdit(user);
+                    });
+                    
+                    userCard.querySelector('.delete-btn').addEventListener('click', function() {
+                        if (confirm(`Are you sure you want to delete ${user.name}?`)) {
+                            deleteUser(user.userId);
+                        }
+                    });
+                });
+            }
+
+            // Fill form with user data for editing
+            function fillFormForEdit(user) {
+                userIdInput.value = user.userId;
+                nameInput.value = user.name;
+                rollNumberInput.value = user.rollNumber;
+                addressInput.value = user.address;
+                countryInput.value = user.country;
+                pincodeInput.value = user.pincode;
+                submitBtn.textContent = 'Update User';
+                
+                // Scroll to form
+                document.querySelector('.form-container').scrollIntoView({ behavior: 'smooth' });
+            }
+
+            // Create new user
+            function createUser() {
+                showLoading(true);
+                
+                // First, get a presigned URL for S3 upload
+                fetch(getUploadUrlEndpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        fileName: userImageInput.files[0].name,
+                        contentType: userImageInput.files[0].type
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    // Upload image to S3 using the presigned URL
+                    return fetch(data.uploadUrl, {
+                        method: 'PUT',
+                        body: userImageInput.files[0],
+                        headers: {
+                            'Content-Type': userImageInput.files[0].type
+                        }
+                    }).then(() => {
+                        // After successful upload, save user data to DynamoDB
+                        return fetch(createUserEndpoint, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                name: nameInput.value,
+                                rollNumber: rollNumberInput.value,
+                                address: addressInput.value,
+                                country: countryInput.value,
+                                pincode: pincodeInput.value,
+                                imageUrl: data.imageUrl
+                            })
+                        });
+                    });
+                })
+                .then(response => response.json())
+                .then(() => {
+                    resetForm();
+                    fetchUsers();
+                    alert('User added successfully!');
+                })
+                .catch(error => {
+                    console.error('Error creating user:', error);
+                    showLoading(false);
+                    alert('Failed to create user. Please try again.');
+                });
+            }
+
+            // Update function
+            function updateUser(userId) {
+                showLoading(true);
+                
+                let updateData = {
+                    name: nameInput.value,
+                    rollNumber: rollNumberInput.value,
+                    address: addressInput.value,
+                    country: countryInput.value,
+                    pincode: pincodeInput.value
+                };
+                
+                // Check if a new image was selected
+                if (userImageInput.files.length > 0) {
+                    // Get a new presigned URL for image upload
+                    fetch(getUploadUrlEndpoint, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            fileName: userImageInput.files[0].name,
+                            contentType: userImageInput.files[0].type
+                        })
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        // Upload the new image
+                        return fetch(data.uploadUrl, {
+                            method: 'PUT',
+                            body: userImageInput.files[0],
+                            headers: {
+                                'Content-Type': userImageInput.files[0].type
+                            }
+                        }).then(() => {
+                            // Add the new image URL to update data
+                            updateData.imageUrl = data.imageUrl;
+                            
+                            // Send the update request
+                            return updateUserData(userId, updateData);
+                        });
+                    })
+                    .then(() => {
+                        resetForm();
+                        fetchUsers();
+                        alert('User updated successfully!');
+                        showLoading(false);
+                    })
+                    .catch(error => {
+                        console.error('Error updating user with new image:', error);
+                        showLoading(false);
+                        alert('Failed to update user. Please try again.');
+                    });
+                } else {
+                    // No new image, just update the user data
+                    updateUserData(userId, updateData)
+                        .then(() => {
+                            resetForm();
+                            fetchUsers();
+                            alert('User updated successfully!');
+                            showLoading(false);
+                        })
+                        .catch(error => {
+                            console.error('Error updating user data:', error);
+                            showLoading(false);
+                            alert('Failed to update user. Please try again.');
+                        });
+                }
+            }
+
+            // Helper function to update user data
+            function updateUserData(userId, data) {
+                console.log("Updating user:", userId);
+                console.log("Update data:", data);
+                
+                // Correct URL construction with ?action=update
+                const updateUrl = `${apiUrl}/users?action=update&userId=${userId}`;
+                console.log("Update URL:", updateUrl);
+                
+                return fetch(updateUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data)
+                })
+                .then(response => {
+                    console.log("Response status:", response.status);
+                    if (!response.ok) {
+                        // Try to get error details from the response
+                        return response.text().then(text => {
+                            console.error("Error response body:", text);
+                            try {
+                                return Promise.reject(JSON.parse(text).error || 'Update failed');
+                            } catch (e) {
+                                return Promise.reject('Update failed: ' + text);
+                            }
+                        });
+                    }
+                    return response.json();
+                });
+            }
+
+            // Delete function
+            function deleteUser(userId) {
+                showLoading(true);
+                
+                fetch(`${deleteUserEndpoint}&userId=${userId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({})
+                })
+                .then(() => {
+                    fetchUsers();
+                    alert('User deleted successfully!');
+                })
+                .catch(error => {
+                    console.error('Error deleting user:', error);
+                    showLoading(false);
+                    alert('Failed to delete user. Please try again.');
+                });
+            }
+
+            // Reset form after submission
+            function resetForm() {
+                userForm.reset();
+                userIdInput.value = '';
+                submitBtn.textContent = 'Submit';
+            }
+
+            // Show/hide loading indicator
+            function showLoading(show) {
+                loadingIndicator.style.display = show ? 'block' : 'none';
+            }
+        });
+    </script>
+</body>
+</html>
